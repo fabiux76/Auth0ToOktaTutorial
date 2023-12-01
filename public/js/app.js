@@ -1,13 +1,15 @@
 let authClient = null;
 
 var baseOktaURL = 'https://dev-02388022.okta.com/oauth2/default';
-var appClientID = '0oadgesaodnMo8lxl5d7';
+var appClientID = '0oadfyos6nUHduhb85d7';
+var appState = {};
+
 
 const config = {
   // Required Fields for OIDC client
   url: baseOktaURL,
   clientId: appClientID,
-  redirectUri: 'http://localhost:9000/', //or the redirect URI for your app
+  redirectUri: 'http://localhost:3000/login/callback', //or the redirect URI for your app
   issuer: baseOktaURL, // oidc
   scopes: ['openid', 'profile', 'email'],
   //pkce: true //The PKCE OAuth flow will be used by default. Cfr: https://github.com/okta/okta-auth-js/#pkce-oauth-20-flow
@@ -185,7 +187,9 @@ function handleTransaction(transaction) {
 
   switch (transaction.status) {
     case 'PENDING':
-      throw new Error('TODO: add handling for MFA');
+      hideSigninForm();
+      updateAppState({ transaction });
+      showMfa();
     case 'FAILURE':
       showError(transaction.error);
       break;
@@ -215,6 +219,148 @@ function endAuthFlow(tokens) {
   updateUI();
 }
 
+function showMfa() {
+  document.getElementById('mfa').style.display = 'block';
+
+  const transaction = appState.transaction;
+  if (transaction.status === 'PENDING') {
+    const nextStep = transaction.nextStep;
+    switch (nextStep.name) {      
+      case 'enroll-authenticator':
+      case 'challenge-authenticator':
+        showMfaChallenge();
+        break;
+      default:
+        throw new Error(`TODO: showMfa: handle nextStep: ${nextStep.name}`);
+    }
+  }
+}
+
+function showMfaChallenge() {
+  document.getElementById('mfa-challenge').style.display = 'block';
+  document.querySelector('#mfa .header').innerText = 'MFA challenge';
+  showPrevMfa();
+
+  const authenticator = appState.transaction.nextStep.authenticator;
+
+  // Phone/SMS and App
+  if (authenticator.type == 'app') {
+    return showChallengePhone();
+  }
+}
+
+function showChallengePhone() {
+  document.getElementById('mfa-challenge-phone').style.display = 'block';
+  document.querySelector('#mfa .header').innerText = 'Phone/SMS';
+  showSubmitMfa();
+}
+
+function showSubmitMfa() {
+  document.getElementById('mfa-submit').style.display = 'inline';
+}
+
+function submitMfa() {
+  if (!config.useInteractionCodeFlow) {
+    return submitMfaAuthn();
+  }
+
+  const nextStep = appState.transaction.nextStep;
+  if (nextStep.name === 'authenticator-enrollment-data') {
+    return submitAuthenticatorEnrollmentData();
+  }
+  if (nextStep.name === 'authenticator-verification-data') {
+    return submitAuthenticatorVerificationData();
+  }
+  if (nextStep.name === 'challenge-authenticator' || nextStep.name === 'enroll-authenticator') {
+    return submitChallengeAuthenticator();
+  }
+  if (nextStep.name === 'reset-authenticator') {
+    return submitNewPasswordForm();
+  }
+  throw new Error(`TODO: submitMfa: handle submit for nextStep: ${nextStep.name}`);
+}
+function submitChallengeAuthenticator() {
+  const authenticator = appState.transaction.nextStep.authenticator;
+  
+  // Phone/SMS
+  if (authenticator.type === 'phone' || authenticator.type === 'app') {
+    return submitChallengePhone();
+  }
+
+  // Security Question
+  if (authenticator.type === 'security_question') {
+    return submitChallengeQuestion();
+  }
+
+  // Email
+  if (authenticator.type === 'email') {
+    return submitChallengeEmail();
+  }
+
+  throw new Error(`TODO: handle submit challenge-authenticator for authenticator type ${authenticator.type}`);
+}
+
+window._submitMfa = bindClick(submitMfa);
+
+function showPrevMfa() {
+  document.getElementById('mfa-prev').style.display = 'inline';
+  hideCancelMfa();
+}
+
+function hidePrevMfa() {
+  document.getElementById('mfa-prev').style.display = 'none';
+}
+
+function showCancelMfa() {
+  document.getElementById('mfa-cancel').style.display = 'inline';
+  hidePrevMfa();
+}
+function hideCancelMfa() {
+  document.getElementById('mfa-cancel').style.display = 'none';
+}
+
+function submitChallengePhone() {
+  hideMfa();
+  const passCode = document.querySelector('#mfa-challenge-phone input[name=passcode]').value;
+
+  // IDX
+  authClient.idx.authenticate({ verificationCode: passCode })
+    .then(handleTransaction)
+    .catch(showError);
+}
+
+
 function showError(error) {
   console.log(error);
+}
+
+function updateAppState(props) {
+  Object.assign(appState, props);
+  //document.getElementById('appState').innerText = stringify(appState);
+}
+
+function hideSubmitMfa() {
+  document.getElementById('mfa-submit').style.display = 'none';
+}
+
+function hideMfa() {
+  document.getElementById('mfa').style.display = 'none';
+  document.querySelector('#mfa .header').innerHTML = '';
+  hideSubmitMfa();
+  /*
+  hideMfaEnroll();
+  hideMfaEnrollActivate();
+  hideMfaRequired();
+  hideMfaChallenge();
+  hideAuthenticatorVerificationData();
+  */
+}
+
+
+function stringify(obj) {
+  // Convert false/undefined/null into "null"
+  if (!obj) {
+    return 'null';
+  }
+  return JSON.stringify(obj, null, 2);
 }
