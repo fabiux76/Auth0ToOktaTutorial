@@ -187,6 +187,9 @@ function handleTransaction(transaction) {
 
   switch (transaction.status) {
     case 'PENDING':
+      if (transaction.nextStep.name === 'identify') {
+        showError("Handle identify");
+      }
       hideSigninForm();
       updateAppState({ transaction });
       showMfa();
@@ -206,7 +209,6 @@ function handleTransaction(transaction) {
 
 function hideSigninForm() {
   document.getElementById('static-signin-form').style.display = 'none';
-  //document.getElementById('dynamic-signin-form').style.display = 'none';
 }
 
 function endAuthFlow(tokens) {
@@ -243,7 +245,6 @@ function showMfaChallenge() {
 
   const authenticator = appState.transaction.nextStep.authenticator;
 
-  // Phone/SMS and App
   if (authenticator.type == 'app') {
     return showChallengePhone();
   }
@@ -260,41 +261,18 @@ function showSubmitMfa() {
 }
 
 function submitMfa() {
-  if (!config.useInteractionCodeFlow) {
-    return submitMfaAuthn();
-  }
-
   const nextStep = appState.transaction.nextStep;
-  if (nextStep.name === 'authenticator-enrollment-data') {
-    return submitAuthenticatorEnrollmentData();
-  }
-  if (nextStep.name === 'authenticator-verification-data') {
-    return submitAuthenticatorVerificationData();
-  }
   if (nextStep.name === 'challenge-authenticator' || nextStep.name === 'enroll-authenticator') {
     return submitChallengeAuthenticator();
-  }
-  if (nextStep.name === 'reset-authenticator') {
-    return submitNewPasswordForm();
   }
   throw new Error(`TODO: submitMfa: handle submit for nextStep: ${nextStep.name}`);
 }
 function submitChallengeAuthenticator() {
   const authenticator = appState.transaction.nextStep.authenticator;
   
-  // Phone/SMS
+  // Phone/SMS and app
   if (authenticator.type === 'phone' || authenticator.type === 'app') {
     return submitChallengePhone();
-  }
-
-  // Security Question
-  if (authenticator.type === 'security_question') {
-    return submitChallengeQuestion();
-  }
-
-  // Email
-  if (authenticator.type === 'email') {
-    return submitChallengeEmail();
   }
 
   throw new Error(`TODO: handle submit challenge-authenticator for authenticator type ${authenticator.type}`);
@@ -329,14 +307,12 @@ function submitChallengePhone() {
     .catch(showError);
 }
 
-
 function showError(error) {
   console.log(error);
 }
 
 function updateAppState(props) {
   Object.assign(appState, props);
-  //document.getElementById('appState').innerText = stringify(appState);
 }
 
 function hideSubmitMfa() {
@@ -347,15 +323,12 @@ function hideMfa() {
   document.getElementById('mfa').style.display = 'none';
   document.querySelector('#mfa .header').innerHTML = '';
   hideSubmitMfa();
-  /*
-  hideMfaEnroll();
-  hideMfaEnrollActivate();
-  hideMfaRequired();
   hideMfaChallenge();
-  hideAuthenticatorVerificationData();
-  */
 }
 
+function hideMfaChallenge() {
+  document.getElementById('mfa-challenge').style.display = 'none';
+}
 
 function stringify(obj) {
   // Convert false/undefined/null into "null"
