@@ -246,13 +246,13 @@ function showMfaChallenge() {
   const authenticator = appState.transaction.nextStep.authenticator;
 
   if (authenticator.type == 'app') {
-    return showChallengePhone();
+    return showChallengeOktaVerify();
   }
 }
 
-function showChallengePhone() {
-  document.getElementById('mfa-challenge-phone').style.display = 'block';
-  document.querySelector('#mfa .header').innerText = 'Okta Verify Code';
+function showChallengeOktaVerify() {
+  document.getElementById('mfa-challenge-okta-verify').style.display = 'block';
+  document.querySelector('#mfa .header').innerText = 'Okta Verify';
   showSubmitMfa();
 }
 
@@ -271,8 +271,8 @@ function submitChallengeAuthenticator() {
   const authenticator = appState.transaction.nextStep.authenticator;
   
   // Phone/SMS and app
-  if (authenticator.type === 'phone' || authenticator.type === 'app') {
-    return submitChallengePhone();
+  if (authenticator.type === 'app') {
+    return submitChallengeOktaVerify();
   }
 
   throw new Error(`TODO: handle submit challenge-authenticator for authenticator type ${authenticator.type}`);
@@ -297,9 +297,9 @@ function hideCancelMfa() {
   document.getElementById('mfa-cancel').style.display = 'none';
 }
 
-function submitChallengePhone() {
+function submitChallengeOktaVerify() {
   hideMfa();
-  const passCode = document.querySelector('#mfa-challenge-phone input[name=passcode]').value;
+  const passCode = document.querySelector('#mfa-challenge-okta-verify input[name=passcode]').value;
 
   // IDX
   authClient.idx.authenticate({ verificationCode: passCode })
