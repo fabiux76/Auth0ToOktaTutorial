@@ -252,7 +252,7 @@ function showMfaChallenge() {
 
 function showChallengePhone() {
   document.getElementById('mfa-challenge-phone').style.display = 'block';
-  document.querySelector('#mfa .header').innerText = 'Phone/SMS';
+  document.querySelector('#mfa .header').innerText = 'Okta Verify Code';
   showSubmitMfa();
 }
 
